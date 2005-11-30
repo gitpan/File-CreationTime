@@ -2,6 +2,7 @@ package File::CreationTime;
 
 use warnings;
 use strict;
+use File::Attribute;
 
 use Exporter;
 our @ISA = 'Exporter';
@@ -14,11 +15,11 @@ File::CreationTime - Keeps track of file creation times
 
 =head1 VERSION
 
-Version 1.01
+Version 1.02
 
 =cut
 
-our $VERSION = '1.01';
+our $VERSION = '1.02';
 
 =head1 SYNOPSIS
 
@@ -53,53 +54,20 @@ called.
 
 sub creation_time {
     my $filename = shift;
+    my $ATTRIBUTE = "creationtime";
+
     die "$filename does not exist" if !-e $filename;
     
-    my ($dir, $file, $ctime_file);
-    
-    # 'constants'
-    my $FILENAME_CLASS = "[^\/]";                # class that matches filenames
-    my $CREATION_TIME_PREFIX = ".";
-    my $CREATION_TIME_SUFFIX = ".creationtime";
+    my $ctime = read_attribute({path=>$filename,
+				attribute=>$ATTRIBUTE,
+				top=>$filename});
 
-    if($filename =~ /($FILENAME_CLASS+)\/($FILENAME_CLASS+)$/){
-	$dir = $1;
-	$file = $2;
-	$ctime_file = "$dir/$CREATION_TIME_PREFIX$file$CREATION_TIME_SUFFIX";
-    }
-    elsif ($filename =~ /^($FILENAME_CLASS+)$/){
-	$dir = "";
-	$file = $1;
-	$ctime_file = "$CREATION_TIME_PREFIX$file$CREATION_TIME_SUFFIX";
-    }
-    else {
-	die "Invalid path format ($filename)";
-    }
+    return $ctime if(defined $ctime);
     
-    if(-e $ctime_file){ 
-	open my $ctime_store, '<', $ctime_file or 
-	  die "Error opening ctime file $ctime_file: $!";
-	
-	while(my $line = <$ctime_store>){
-	    if($line =~ /^\d+$/){
-		close $ctime_store;
-		return int($line);
-	    }
-	}
-	close $ctime_store;
-    }
-
-    # ctime file didn't exist or wasn't in the correct format
+    # no ctime file?  create one.
     
-    # get the modification time of the file
     my $mtime = (stat($filename))[9];
-    
-    open my $ctime_store, '>', $ctime_file or
-      die "Error opening ctime file $ctime_file: $!";
-    
-    print {$ctime_store} "$mtime\n" or die "Write error: $!";
-    close $ctime_store;
-
+    write_attribute({path=>$filename,attribute=>$ATTRIBUTE}, $mtime);
     return $mtime;
 }
 
