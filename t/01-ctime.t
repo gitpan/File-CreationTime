@@ -1,37 +1,36 @@
 #!/usr/bin/perl
 # Copyright (c) 2005 Jonathan T. Rockway
 
-use Test::More tests=>8;
+use Test::More tests=>3;
 use File::CreationTime;
 
-# test cached info
-is(creation_time("t/test.file"), 123456, "creation time of known file");
+sub cleanup {
+    unlink("new.file");
+}
 
 # cleanup from last time, if necessary
-unlink("/tmp/new.file");
-unlink("/tmp/.new.file.creationtime");
-ok(!-e "/tmp/.new.file.creationtime", "test file ctime record removal");
-ok(!-e "/tmp/new.file", "test file removal");
+cleanup;
 
 # create a file
-system("touch /tmp/new.file");
-ok(-e "/tmp/new.file", "test file creation");
+open my $testfile, ">new.file";
+print {$testfile} "hello, world\n";
+close $testfile;
 
-# make sure it doesn't have a creation time
-ok(!-e "/tmp/.new.file.creationtime", "no previous creation time");
+ok(-e "new.file", "test file creation");
 
 # record the ctime
-ok(my $ctime = creation_time("/tmp/new.file"), "creation time didn't die");
-ok(-e "/tmp/.new.file.creationtime", "created creation time file");
+ok(my $ctime = creation_time("new.file"), "creation time didn't die");
 
 # change the mtime of the file by ... 2 seconds
-sleep 2;
-`echo Test >> /tmp/new.file`;
+print {*STDERR} " (Sleeping 5 seconds)\n";
+sleep 5;
+open $testfile, ">new.file";
+print {$testfile} "hello, world (again)\n";
+close $testfile;
 
 # see if creation_time works :)
-is(creation_time("/tmp/new.file"), 
+is(creation_time("new.file"), 
    $ctime, "creation time matched between tests");
 
 # cleanup
-unlink("/tmp/new.file");
-unlink("/tmp/.new.file.creationtime");
+cleanup;

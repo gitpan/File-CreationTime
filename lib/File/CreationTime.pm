@@ -2,7 +2,7 @@ package File::CreationTime;
 
 use warnings;
 use strict;
-use File::Attribute;
+use File::ExtAttr qw(getfattr setfattr);
 
 use Exporter;
 our @ISA = 'Exporter';
@@ -15,11 +15,11 @@ File::CreationTime - Keeps track of file creation times
 
 =head1 VERSION
 
-Version 1.03
+Version 2.00
 
 =cut
 
-our $VERSION = '1.03';
+our $VERSION = '2.00';
 
 =head1 SYNOPSIS
 
@@ -31,8 +31,8 @@ provide such information.
     my $file = "~/path/to/file";
     print "$file was created: ". creation_time($file). "\n";
 
-Write access is required to the parent directory of the file
-the first time creation_time is called.
+Your filesystem need to support extended filesystem attributes, and
+you need to be able to write the target file.
 
 =head1 EXPORT
 
@@ -54,37 +54,33 @@ called.
 
 sub creation_time {
     my $filename = shift;
-    my $ATTRIBUTE = "creationtime";
+    my $ATTRIBUTE = "user.creation_time"; # use user.* to appease Linux
 
     die "$filename does not exist" if !-e $filename;
     
-    my $ctime = read_attribute({path=>$filename,
-				attribute=>$ATTRIBUTE,
-				top=>$filename});
-
+    my $ctime = getfattr($filename, $ATTRIBUTE);
+    
     return $ctime if(defined $ctime);
     
-    # no ctime file?  create one.
-    
+    # no ctime attr?  create one.
     my $mtime = (stat($filename))[9];
-    write_attribute({path=>$filename,attribute=>$ATTRIBUTE}, $mtime);
+    setfattr($filename, $ATTRIBUTE, $mtime) or 
+      die "Failed to set attribute $ATTRIBUTE on $filename";
+
     return $mtime;
 }
 
 =head1 ACCURACY
 
 The algorithm used to determine the creation time is as follows.  The
-first time creation_time is called, a file called
-.[filename].creationtime is created in the same directory as filename.
-This file contains the time that [filename] was most recently
-modified.  As such, if you have a file that's several years old, then
-modify it, then call creation_time, the file's creation time will
-obviously be wrong.  However, if you create a file, call
-creation_time, wait several years, modify the file, then call
-creation_time again, the result will be accurate.
+first time creation_time is called, an extended filesystem attribute
+called creation_time is created and is set to contain the time that
+[filename] was most recently modified.  As such, if you have a file
+that's several years old, then modify it, then call creation_time, the
+file's creation time will obviously be wrong.  However, if you create
+a file, call creation_time, wait several years, modify the file, then
+call creation_time again, the result will be accurate.
 
-If you modify .[filename].creationtime, the result will be wrong.  The
-module isn't magic, after all :)
 
 =head1 DIAGNOSTICS
 
@@ -99,18 +95,15 @@ message.
 You passed [path] to creation_time, but it doesn't exist (or you can't
 read it).
 
-=head2 Error opening ctime file [filename]
+=head2 Failed to set attribute user.creation_time on [file]
 
-The OS returned an error when trying to open [filename].  Check permissions.
+Couldn't create the attribute for some reason.  Does your filesystem
+support extended filesystem attributes?
 
 =head1 BUGS
 
-If you delete [filename], then create a new file with the same name,
-the old creation time will stick around.
-
-If you create millions of files, call creation_time on them, then
-remove them, the old creation_time data will waste disk space.  If
-this is a problem, have a cron job remove them.
+Doesn't work on antiquated OSes that don't support extended filesystem
+attributes.  Use an older version (1.xx) of this module if you need that.
 
 =head2 REPORTING
 
