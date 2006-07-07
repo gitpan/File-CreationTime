@@ -6,6 +6,7 @@ README
 lib/File/CreationTime.pm
 t/00-load.t
 t/01-ctime.t
+t/02-ctime_new_thread.t
 t/pod-coverage.t
 t/pod.t
 

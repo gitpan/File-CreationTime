@@ -6,6 +6,7 @@ use File::CreationTime;
 
 sub cleanup {
     unlink("new.file");
+    unlink("new.file.time");
 }
 
 # cleanup from last time, if necessary
@@ -19,18 +20,19 @@ close $testfile;
 ok(-e "new.file", "test file creation");
 
 # record the ctime
-ok(my $ctime = creation_time("new.file"), "creation time didn't die");
+ok(my $ctime = creation_time("new.file"), "creation_time didn't die");
 
-# change the mtime of the file by ... 2 seconds
+open my $timefile, ">new.file.time";
+print {$timefile} "$ctime\n";
+close $timefile;
+
+# change the mtime of the file by ... 5 seconds
 print {*STDERR} " (Sleeping 5 seconds)\n";
 sleep 5;
+
 open $testfile, ">new.file";
 print {$testfile} "hello, world (again)\n";
 close $testfile;
 
-# see if creation_time works :)
-is(creation_time("new.file"), 
-   $ctime, "creation time matched between tests");
+is(creation_time("new.file"), $ctime, "creation time matched between tests");
 
-# cleanup
-cleanup;

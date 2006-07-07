@@ -2,7 +2,7 @@ package File::CreationTime;
 
 use warnings;
 use strict;
-use File::ExtAttr qw(getfattr setfattr);
+use File::Attributes qw(get_attribute set_attribute);
 
 use Exporter;
 our @ISA = 'Exporter';
@@ -15,58 +15,58 @@ File::CreationTime - Keeps track of file creation times
 
 =head1 VERSION
 
-Version 2.00
+Version 2.02
 
 =cut
 
-our $VERSION = '2.00';
+our $VERSION = '2.02';
 
 =head1 SYNOPSIS
 
-Keeps track of creation times on UNIX filesystems that don't normally
+Keeps track of creation times on filesystems that don't normally
 provide such information.
 
     use File::CreationTime;
 
-    my $file = "~/path/to/file";
+    my $file = '/path/to/file';
     print "$file was created: ". creation_time($file). "\n";
-
-Your filesystem need to support extended filesystem attributes, and
-you need to be able to write the target file.
 
 =head1 EXPORT
 
-=head2 create_time
-
-Used like perl's builtin -C, but returns the creation time of a file
-(in seconds past the epoch), not the inode change time.
+=head2 creation_time
 
 =head1 FUNCTIONS
 
 =head2 creation_time
-     creation_time("/path/to/file")
+     creation_time('/path/to/file')
 
 Returns the creation time of /path/to/file in seconds past the epoch.
-Requires write access to /path/to/file the first time the function is
-called.
+Requires permission to modify extended filesystem attributes the first
+time the function is called.  All subsequent invocations require read
+access only.
 
 =cut
 
 sub creation_time {
     my $filename = shift;
-    my $ATTRIBUTE = "user.creation_time"; # use user.* to appease Linux
+    my $ATTRIBUTE = "creation_time";
 
     die "$filename does not exist" if !-e $filename;
     
-    my $ctime = getfattr($filename, $ATTRIBUTE);
+    my $ctime = 0;
+    eval {
+	$ctime = get_attribute($filename, $ATTRIBUTE);
+    };
     
-    return $ctime if(defined $ctime);
+    return $ctime if $ctime;  # BUG: fails if the ctime is the epoch, exactly
     
     # no ctime attr?  create one.
-    my $mtime = (stat($filename))[9];
-    setfattr($filename, $ATTRIBUTE, $mtime) or 
-      die "Failed to set attribute $ATTRIBUTE on $filename";
-
+    my $mtime = $^T + ((-M $filename) * 86400);
+    
+    eval {
+	set_attribute($filename, $ATTRIBUTE, $mtime);
+    };
+    warn "Failed to set attribute $ATTRIBUTE on $filename: $@" if $@;
     return $mtime;
 }
 
@@ -75,7 +75,7 @@ sub creation_time {
 The algorithm used to determine the creation time is as follows.  The
 first time creation_time is called, an extended filesystem attribute
 called creation_time is created and is set to contain the time that
-[filename] was most recently modified.  As such, if you have a file
+the file was most recently modified.  As such, if you have a file
 that's several years old, then modify it, then call creation_time, the
 file's creation time will obviously be wrong.  However, if you create
 a file, call creation_time, wait several years, modify the file, then
@@ -83,12 +83,6 @@ call creation_time again, the result will be accurate.
 
 
 =head1 DIAGNOSTICS
-
-=head2 Invalid path format
-
-This indicates that you passed a weird path to creation_time.  This is
-a bug in my software -- please report exactly what path caused this
-message.
 
 =head2 [path] does not exist
 
@@ -100,10 +94,19 @@ read it).
 Couldn't create the attribute for some reason.  Does your filesystem
 support extended filesystem attributes?
 
+=head1 SEE ALSO
+
+L<File::Attributes|File::Attributes> handles storing the creation_time
+attribute.
+
 =head1 BUGS
 
-Doesn't work on antiquated OSes that don't support extended filesystem
-attributes.  Use an older version (1.xx) of this module if you need that.
+I'd like to support OSes that actually give you the file creation
+time.  OS X stores this data in their HFS+ filesystem, but you can't
+get at it from any published APIs.  If you know how to do this (from
+XS), then please tell me how or send in a patch.
+
+Other comments and patches are always welcome.
 
 =head2 REPORTING
 
@@ -115,7 +118,7 @@ your bug as I make changes.
 
 =head1 AUTHOR
 
-Jonathan T. Rockway, C<< <jon-cpan@jrock.us> >>
+Jonathan Rockway, C<< <jrockway AT cpan.org> >>.
 
 =head1 COPYRIGHT & LICENSE
 
