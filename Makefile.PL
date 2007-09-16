@@ -1,17 +1,14 @@
 use strict;
 use warnings;
-use ExtUtils::MakeMaker;
+use inc::Module::Install;
 
-WriteMakefile(
-    NAME                => 'File::CreationTime',
-    AUTHOR              => 'Jonathan T. Rockway <jon-cpan@jrock.us>',
-    VERSION_FROM        => 'lib/File/CreationTime.pm',
-    ABSTRACT_FROM       => 'lib/File/CreationTime.pm',
-    PL_FILES            => {},
-    PREREQ_PM => {
-        'Test::More' => 0,
-	'File::Attributes' => 0,
-   },
-    dist                => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
-    clean               => { FILES => 'File-CreationTime-*' },
-);
+name      'File-CreationTime';
+all_from  'lib/File/CreationTime.pm';
+requires  'File::Attributes';
+build_requires 'Test::More';
+
+if($^O =~ /darwin/){
+    requires 'MacOSX::File::Info';
+}
+
+WriteAll();
